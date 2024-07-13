@@ -1,4 +1,3 @@
-import logo from './logo.svg';
 import './App.css';
 import { useEffect, useRef, useState } from 'react';
 
@@ -7,13 +6,27 @@ function App() {
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
+  const [isPlayerBusted, setIsPlayerBusted] = useState(false);
+  const [hasRoundEnded, setHasRoundEnded] = useState(false);
+  const [endRoundPhrase, setEndRoundPhrase] = useState("");
 
   useEffect(() => {
     const newDeck = generateDeck();
     const shuffledDeck = shuffleDeck(newDeck);
     setDeck(shuffledDeck);
     dealInitialHands(shuffledDeck);
-  }, []);
+  },[]);
+
+  useEffect(() => {
+
+    if(playerHand.length === 0 && dealerHand === 0) {
+      dealInitialHands(deck);
+    }
+
+    if(playerHand.length === 2 && dealerHand.length === 2) {
+      earlyBlackJack();
+    }
+  }, [playerHand, dealerHand]);
 
   const generateDeck = () => {
     const newDeck= [];
@@ -56,11 +69,36 @@ function App() {
       const dealerCards = [newDeck.shift(), newDeck.shift()];
       setPlayerHand(playerCards);
       setDealerHand(dealerCards);
-      setDeck(deck);
+      setDeck(newDeck);
+      earlyBlackJack();
     } else {
       console.log("Run out of cards!");
     }
-  };
+  }
+
+  const startNewRound = () => {
+    const emptyHand = [];
+    setPlayerHand(emptyHand);
+    setDealerHand(emptyHand);
+    setHasRoundEnded(false);
+  }
+
+  const earlyBlackJack = () => {
+
+    let playerValue = calculateHandValue(playerHand);
+    let dealerValue = calculateHandValue(dealerHand);
+
+    if(playerValue === 21 && dealerValue === 21) {
+      setEndRoundPhrase("Standoff");
+      setHasRoundEnded(true);
+    } else if(playerValue === 21) {
+      setEndRoundPhrase("You won with BlackJack!");
+      setHasRoundEnded(true);
+    } else if(dealerValue === 21) {
+      setEndRoundPhrase("You lose dealer has BlackJack");
+      setHasRoundEnded(true);
+    }
+  }
 
   const shuffleDeck = (deck) => {
 
@@ -91,7 +129,70 @@ function App() {
     }
 
     return total;
-  } 
+  }
+  
+  const drawCard = (hand, deck) => {
+
+    if(deck.length > 0) {
+      const newDeck = deck.slice();
+      const drawnCard = newDeck.shift();
+      const newHand = [...hand, drawnCard];
+      return {newHand, newDeck};
+    }
+    
+    return {hand, deck};
+  }
+
+  const handlePlayerDraw = () => {
+    const {newHand, newDeck} = drawCard(playerHand, deck);
+    const newHandValue = calculateHandValue(newHand);
+    setPlayerHand(newHand);
+    setDeck(newDeck);
+
+    if(newHandValue > 21) {
+      setEndRoundPhrase("You busted...")
+      setHasRoundEnded(true);
+    }
+  }
+
+  const handleDealerTurn = () => {
+    let newDealerHand = dealerHand.slice();
+    let newDeck = deck.slice();
+    let dealerHandValue = calculateHandValue(newDealerHand);
+
+    while(dealerHandValue < 16 && newDeck.length > 0) {
+      const drawnCard = newDeck.shift();
+      newDealerHand.push(drawnCard);
+      dealerHandValue = calculateHandValue(newDealerHand);
+    }
+
+    if(dealerHandValue > 21) {
+      setEndRoundPhrase("You won!");
+      setHasRoundEnded(true);
+      setDeck(newDeck);
+      setDealerHand(newDealerHand);
+    } else {
+      setDeck(newDeck);
+      setDealerHand(newDealerHand);
+      determineRoundWinner();
+    }
+  }
+
+  const determineRoundWinner = () => {
+
+    let playerValue = calculateHandValue(playerHand);
+    let dealerValue = calculateHandValue(dealerHand);
+    
+    if(playerValue === dealerValue) {
+      setEndRoundPhrase("Draw");
+    } else if(playerValue > dealerValue) {
+      setEndRoundPhrase("You won!")
+    } else {
+      setEndRoundPhrase("You lost...")
+    }
+
+    setHasRoundEnded(true);
+  }
 
   const reShuffleDeck = () => {
     setDeck(shuffleDeck(deck));
@@ -101,21 +202,36 @@ function App() {
 
     <div className="App">
       <div>
-        <h2>Player's Hand</h2>
-        <p>Value: {calculateHandValue(playerHand)}</p>
-        {playerHand.map((card, index) => (
-          <div key={index}>{card.toString()}</div>
-        ))}
+          <h2>Player's Hand</h2>
+          <p>Value: {calculateHandValue(playerHand)}</p>
+          {playerHand.map((card, index) => (
+            <div key={index}>{card.toString()}</div>
+          ))}
 
-        <br></br>
-        <br></br>
+          <button onClick={handlePlayerDraw} disabled={hasRoundEnded}>Hit</button>
+          <button onClick={handleDealerTurn} disabled={hasRoundEnded}>Stand</button>
 
-        <h2>Dealer's Hand</h2>
-        <p>Value: {calculateHandValue(dealerHand)}</p>
-        {dealerHand.map((card, index) => (
-          <div key={index}>{card.toString()}</div>
-        ))}
+          <br></br>
+
+          <h2>Dealer's Hand</h2>
+          <p>Value: {calculateHandValue(dealerHand)}</p>
+          {dealerHand.map((card, index) => (
+            <div key={index}>{card.toString()}</div>
+          ))}
+
+          <br></br>
+
+          <div>
+            {hasRoundEnded && (
+              <div>
+                {endRoundPhrase}
+                <br></br>
+                <button onClick={startNewRound}>Play another round</button>
+              </div>
+            )}
+          </div>
       </div>
+
 
     </div>
 
