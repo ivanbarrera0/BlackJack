@@ -28,35 +28,28 @@ function App() {
   }, [playerHand, dealerHand]);
 
   const generateDeck = () => {
-    const newDeck= [];
+    const suits = ["Clubs", "Spades", "Diamond", "Hearts"];
 
-    for(let i = 0; i < 13; i++) {
+    const values = [
+      {symbol: "A", value: 1},
+      {symbol: "2", value: 2},
+      {symbol: "3", value: 3},
+      {symbol: "4", value: 4},
+      {symbol: "5", value: 5},
+      {symbol: "6", value: 6},
+      {symbol: "7", value: 7},
+      {symbol: "8", value: 8},
+      {symbol: "9", value: 9},
+      {symbol: "10", value: 10},
+      {symbol: "J", value: 10},
+      {symbol: "Q", value: 10},
+      {symbol: "K", value: 10},
+    ]
 
-      let symbol = i + 1;
-      let value = i + 1;
-  
-      if(value === 1) {
-        symbol = "A";
-      } else if(value === 11) {
-        symbol = "J";
-        value = 10;
-      } else if(value === 12) {
-        symbol = "Q";
-        value = 10;
-      } else if(value === 13) {
-        symbol = "K";
-        value = 10;
-      }
-  
-      for(let j = 0; j < 4; j++) {
-  
-        const suit = ["Clubs", "Spades", "Diamond", "Hearts"];
-  
-        const card = new Card(symbol, suit[j], value);
-  
-        newDeck.push(card);
-      }
-    }
+    const newDeck = suits.flatMap(suit =>
+      values.map(({symbol, value}) => new Card(symbol, suit, value))
+    )
+    
     return newDeck; 
   }
 
