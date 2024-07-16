@@ -6,7 +6,6 @@ function App() {
   const [deck, setDeck] = useState([]);
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
-  const [isPlayerBusted, setIsPlayerBusted] = useState(false);
   const [hasRoundEnded, setHasRoundEnded] = useState(false);
   const [endRoundPhrase, setEndRoundPhrase] = useState("");
 
@@ -19,9 +18,9 @@ function App() {
 
   useEffect(() => {
 
-    if(playerHand.length === 0 && dealerHand === 0) {
+    if(playerHand.length === 0 && dealerHand.length === 0 && !hasRoundEnded) {
       dealInitialHands(deck);
-    }
+    }  
 
     if(playerHand.length === 2 && dealerHand.length === 2) {
       earlyBlackJack();
@@ -59,27 +58,25 @@ function App() {
       }
     }
     return newDeck; 
-  };
+  }
 
   const dealInitialHands = (deck) => {
-
-    if(deck.length >= 4) {
+    if(deck && deck.length >= 4) {
       const newDeck = deck.slice();
+      console.log("Deck before dealing: " + newDeck.length);
       const playerCards = [newDeck.shift(), newDeck.shift()];
       const dealerCards = [newDeck.shift(), newDeck.shift()];
       setPlayerHand(playerCards);
       setDealerHand(dealerCards);
       setDeck(newDeck);
-      earlyBlackJack();
     } else {
-      console.log("Run out of cards!");
-    }
+      console.log("Cards are have run out or deck is not initialized");
+    } 
   }
 
   const startNewRound = () => {
-    const emptyHand = [];
-    setPlayerHand(emptyHand);
-    setDealerHand(emptyHand);
+
+    reshuffleDiscardToDeck();
     setHasRoundEnded(false);
   }
 
@@ -108,7 +105,16 @@ function App() {
       [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
     }
     return shuffledDeck;
-  };
+  }
+
+  const reshuffleDiscardToDeck = () => {
+
+    let combinedDeck = deck.slice();
+    const newDeck = shuffleDeck(combinedDeck.concat(playerHand, dealerHand));
+    setDeck(newDeck);
+    setPlayerHand([]);
+    setDealerHand([]);
+  }
 
   const calculateHandValue = (hand) => {
     let total = 0;
@@ -133,12 +139,13 @@ function App() {
   
   const drawCard = (hand, deck) => {
 
-    if(deck.length > 0) {
-      const newDeck = deck.slice();
+    let newDeck = deck.slice();
+
+    if(newDeck && newDeck.length > 0) {
       const drawnCard = newDeck.shift();
       const newHand = [...hand, drawnCard];
       return {newHand, newDeck};
-    }
+    } 
     
     return {hand, deck};
   }
@@ -160,30 +167,27 @@ function App() {
     let newDeck = deck.slice();
     let dealerHandValue = calculateHandValue(newDealerHand);
 
-    while(dealerHandValue < 16 && newDeck.length > 0) {
+    while(dealerHandValue <= 17 && newDeck.length > 0) {
       const drawnCard = newDeck.shift();
       newDealerHand.push(drawnCard);
       dealerHandValue = calculateHandValue(newDealerHand);
     }
 
-    if(dealerHandValue > 21) {
-      setEndRoundPhrase("You won!");
-      setHasRoundEnded(true);
-      setDeck(newDeck);
-      setDealerHand(newDealerHand);
-    } else {
-      setDeck(newDeck);
-      setDealerHand(newDealerHand);
-      determineRoundWinner();
-    }
+    setDeck(newDeck);
+    setDealerHand(newDealerHand);
+    determineRoundWinner(playerHand, newDealerHand);
   }
 
-  const determineRoundWinner = () => {
+  const determineRoundWinner = (playerHand, dealerHand) => {
 
     let playerValue = calculateHandValue(playerHand);
     let dealerValue = calculateHandValue(dealerHand);
-    
-    if(playerValue === dealerValue) {
+
+    if(playerValue > 21) {
+      setEndRoundPhrase("You lost...")
+    } else if(dealerValue > 21) {
+      setEndRoundPhrase("You win!")
+    } else if(playerValue === dealerValue) {
       setEndRoundPhrase("Draw");
     } else if(playerValue > dealerValue) {
       setEndRoundPhrase("You won!")
@@ -192,10 +196,6 @@ function App() {
     }
 
     setHasRoundEnded(true);
-  }
-
-  const reShuffleDeck = () => {
-    setDeck(shuffleDeck(deck));
   }
   
   return (
