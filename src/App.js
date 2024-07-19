@@ -8,17 +8,25 @@ function App() {
   const [dealerHand, setDealerHand] = useState([]);
   const [hasRoundEnded, setHasRoundEnded] = useState(false);
   const [endRoundPhrase, setEndRoundPhrase] = useState("");
+  const [playerChips, setPlayerChips] = useState(1000);
+  const [bet, setBet] = useState(0);
+  const [gameHasStarted, setGameHasStarted] = useState(false);
 
   useEffect(() => {
     const newDeck = generateDeck();
     const shuffledDeck = shuffleDeck(newDeck);
     setDeck(shuffledDeck);
-    dealInitialHands(shuffledDeck);
   },[]);
 
   useEffect(() => {
+    if (gameHasStarted && bet > 0) {
+      dealInitialHands(deck);
+    }
+  }, [gameHasStarted, bet]);
 
-    if(playerHand.length === 0 && dealerHand.length === 0 && !hasRoundEnded) {
+  useEffect(() => {
+
+    if(playerHand.length === 0 && dealerHand.length === 0 && !hasRoundEnded && gameHasStarted) {
       dealInitialHands(deck);
     }  
 
@@ -59,6 +67,7 @@ function App() {
       console.log("Deck before dealing: " + newDeck.length);
       const playerCards = [newDeck.shift(), newDeck.shift()];
       const dealerCards = [newDeck.shift(), newDeck.shift()];
+      setPlayerChips((playerChips) => playerChips - bet);
       setPlayerHand(playerCards);
       setDealerHand(dealerCards);
       setDeck(newDeck);
@@ -77,11 +86,15 @@ function App() {
 
     let playerValue = calculateHandValue(playerHand);
     let dealerValue = calculateHandValue(dealerHand);
+    let playerCurrentChips = playerChips;
+    let currentBet = bet;
 
     if(playerValue === 21 && dealerValue === 21) {
       setEndRoundPhrase("Standoff");
       setHasRoundEnded(true);
     } else if(playerValue === 21) {
+      playerCurrentChips += (currentBet * 2.5);
+      setPlayerChips(playerCurrentChips);
       setEndRoundPhrase("You won with BlackJack!");
       setHasRoundEnded(true);
     } else if(dealerValue === 21) {
@@ -175,26 +188,46 @@ function App() {
 
     let playerValue = calculateHandValue(playerHand);
     let dealerValue = calculateHandValue(dealerHand);
+    let playerCurrentChips = playerChips;
+    let currentBet = bet;
 
     if(playerValue > 21) {
       setEndRoundPhrase("You lost...")
     } else if(dealerValue > 21) {
+      playerCurrentChips += (currentBet * 2);
       setEndRoundPhrase("You win!")
     } else if(playerValue === dealerValue) {
+      playerCurrentChips += currentBet;
       setEndRoundPhrase("Draw");
     } else if(playerValue > dealerValue) {
-      setEndRoundPhrase("You won!")
+      playerCurrentChips += (currentBet * 2);
+      setEndRoundPhrase("You win!")
     } else {
       setEndRoundPhrase("You lost...")
     }
 
+    setPlayerChips(playerCurrentChips);
     setHasRoundEnded(true);
+  }
+
+  const startGame = () => {
+    setBet(10);
+    setGameHasStarted(true);
   }
   
   return (
 
     <div className="App">
-      <div>
+
+      {!gameHasStarted ? (
+        <div>
+          <h1>Welcome to BlackJack</h1>
+          <button onClick={startGame}>Start the Game</button>
+        </div>
+      ) : (
+        <div>
+          <h2>Your chips: {playerChips}</h2>
+          <h2>Current Bet: {bet}</h2>
           <h2>Player's Hand</h2>
           <p>Value: {calculateHandValue(playerHand)}</p>
           {playerHand.map((card, index) => (
@@ -224,12 +257,9 @@ function App() {
             )}
           </div>
       </div>
-
-
+    )}
     </div>
-
-    
-  );
+  )
 }
 
 class Card {
