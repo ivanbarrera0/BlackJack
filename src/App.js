@@ -11,6 +11,7 @@ function App() {
   const [playerChips, setPlayerChips] = useState(1000);
   const [bet, setBet] = useState(0);
   const [gameHasStarted, setGameHasStarted] = useState(false);
+  const [firstTurn, setFirstTurn] = useState(true);
 
   useEffect(() => {
     const newDeck = generateDeck();
@@ -19,10 +20,10 @@ function App() {
   },[]);
 
   useEffect(() => {
-    if (gameHasStarted && bet > 0) {
+    if (gameHasStarted) {
       dealInitialHands(deck);
     }
-  }, [gameHasStarted, bet]);
+  }, [gameHasStarted]);
 
   useEffect(() => {
 
@@ -79,7 +80,9 @@ function App() {
   const startNewRound = () => {
 
     reshuffleDiscardToDeck();
+    setBet(10);
     setHasRoundEnded(false);
+    setFirstTurn(true);
   }
 
   const earlyBlackJack = () => {
@@ -157,8 +160,10 @@ function App() {
   }
 
   const handlePlayerDraw = () => {
+
     const {newHand, newDeck} = drawCard(playerHand, deck);
     const newHandValue = calculateHandValue(newHand);
+    setFirstTurn(false);
     setPlayerHand(newHand);
     setDeck(newDeck);
 
@@ -168,12 +173,33 @@ function App() {
     }
   }
 
-  const handleDealerTurn = () => {
+  const handleDoubleDown = () => {
+    setPlayerChips(prevChips => prevChips - bet);
+    setBet(prevBet => prevBet * 2);
+
+    // Check if the deck increases here
+    // NOTE: highlight 'newDeck' here
+    const {newHand, newDeck} = drawCard(playerHand, deck);
+    const newHandValue = calculateHandValue(newHand);
+    setPlayerHand(newHand);
+    setDeck(newDeck);
+
+    if(newHandValue > 21) {
+      setEndRoundPhrase("You busted...")
+      setHasRoundEnded(true);
+    } else {
+      handleDealerTurn(newHand, newDeck);
+    }
+  }
+
+  const handleDealerTurn = (newHand, updatedDeck) => {
+
     let newDealerHand = dealerHand.slice();
-    let newDeck = deck.slice();
+    let newDeck = updatedDeck.slice();
     let dealerHandValue = calculateHandValue(newDealerHand);
 
     while(dealerHandValue <= 17 && newDeck.length > 0) {
+      // Switch to drawing the cards similar to the way the player draws cards?
       const drawnCard = newDeck.shift();
       newDealerHand.push(drawnCard);
       dealerHandValue = calculateHandValue(newDealerHand);
@@ -181,13 +207,18 @@ function App() {
 
     setDeck(newDeck);
     setDealerHand(newDealerHand);
-    determineRoundWinner(playerHand, newDealerHand);
+    determineRoundWinner(newHand, newDealerHand);
+    setHasRoundEnded(true);
   }
 
   const determineRoundWinner = (playerHand, dealerHand) => {
 
+    console.log("Value during comparison");
+
     let playerValue = calculateHandValue(playerHand);
+    console.log(playerValue);
     let dealerValue = calculateHandValue(dealerHand);
+    console.log(dealerValue);
     let playerCurrentChips = playerChips;
     let currentBet = bet;
 
@@ -207,7 +238,6 @@ function App() {
     }
 
     setPlayerChips(playerCurrentChips);
-    setHasRoundEnded(true);
   }
 
   const startGame = () => {
@@ -235,7 +265,8 @@ function App() {
           ))}
 
           <button onClick={handlePlayerDraw} disabled={hasRoundEnded}>Hit</button>
-          <button onClick={handleDealerTurn} disabled={hasRoundEnded}>Stand</button>
+          <button onClick={() => handleDealerTurn(playerHand, deck)} disabled={hasRoundEnded}>Stand</button>
+          <button onClick={handleDoubleDown} disabled={hasRoundEnded || !firstTurn}>Double Down</button>
 
           <br></br>
 
