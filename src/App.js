@@ -1,17 +1,18 @@
+import HandDisplay from './HandDisplay';
 import './App.css';
 import { useEffect, useRef, useState } from 'react';
 
 function App() {
 
   const [deck, setDeck] = useState([]);
-  const [playerHand, setPlayerHand] = useState([]);
+  const [playerHands, setPlayerHands] = useState([[]]);
   const [dealerHand, setDealerHand] = useState([]);
   const [hasRoundEnded, setHasRoundEnded] = useState(false);
   const [endRoundPhrase, setEndRoundPhrase] = useState("");
   const [playerChips, setPlayerChips] = useState(1000);
   const [bet, setBet] = useState(0);
   const [gameHasStarted, setGameHasStarted] = useState(false);
-  const [firstTurn, setFirstTurn] = useState(true);
+  const [activeHandIndex, setActiveHandIndex] = useState(0);
 
   useEffect(() => {
     const newDeck = generateDeck();
@@ -27,14 +28,14 @@ function App() {
 
   useEffect(() => {
 
-    if(playerHand.length === 0 && dealerHand.length === 0 && !hasRoundEnded && gameHasStarted) {
+    if(playerHands[0].length === 0 && dealerHand.length === 0 && !hasRoundEnded && gameHasStarted) {
       dealInitialHands(deck);
     }  
 
-    if(playerHand.length === 2 && dealerHand.length === 2) {
+    if(playerHands[0].length === 2 && dealerHand.length === 2) {
       earlyBlackJack();
     }
-  }, [playerHand, dealerHand]);
+  }, [playerHands, dealerHand]);
 
   const generateDeck = () => {
     const suits = ["Clubs", "Spades", "Diamond", "Hearts"];
@@ -69,11 +70,11 @@ function App() {
       const playerCards = [newDeck.shift(), newDeck.shift()];
       const dealerCards = [newDeck.shift(), newDeck.shift()];
       setPlayerChips((playerChips) => playerChips - bet);
-      setPlayerHand(playerCards);
+      setPlayerHands([playerCards]);
       setDealerHand(dealerCards);
       setDeck(newDeck);
     } else {
-      console.log("Cards are have run out or deck is not initialized");
+      console.log("Not enough cards or deck is not initialized");
     } 
   }
 
@@ -82,12 +83,14 @@ function App() {
     reshuffleDiscardToDeck();
     setBet(10);
     setHasRoundEnded(false);
-    setFirstTurn(true);
+    setPlayerHands([[]]);
+    setActiveHandIndex(0);
+    setEndRoundPhrase("");
   }
 
   const earlyBlackJack = () => {
 
-    let playerValue = calculateHandValue(playerHand);
+    let playerValue = calculateHandValue(playerHands);
     let dealerValue = calculateHandValue(dealerHand);
     let playerCurrentChips = playerChips;
     let currentBet = bet;
@@ -118,10 +121,10 @@ function App() {
 
   const reshuffleDiscardToDeck = () => {
 
-    let combinedDeck = deck.slice();
-    const newDeck = shuffleDeck(combinedDeck.concat(playerHand, dealerHand));
+    let combinedDeck = deck.concat(...playerHands.flat(), ...dealerHand);
+    const newDeck = shuffleDeck(combinedDeck);
     setDeck(newDeck);
-    setPlayerHand([]);
+    setPlayerHands([[]]);
     setDealerHand([]);
   }
 
@@ -129,14 +132,14 @@ function App() {
     let total = 0;
     let aceCount = 0;
 
-    for(const card of hand) {
+    hand.forEach(card => {
       if(card.symbol === 'A') {
         aceCount++;
         total++;
       } else {
         total += card.value;
       }
-    }
+    });
 
     while(aceCount > 0 && total + 10 <= 21) {
       total += 10;
@@ -145,61 +148,103 @@ function App() {
 
     return total;
   }
+  const handleStand = () => {
+    moveToNextHandOrEndRound();
+  }
+
+  const moveToNextHandOrEndRound = () => {
+    if(activeHandIndex < playerHands.length - 1) {
+      setActiveHandIndex(activeHandIndex + 1);
+    } else {
+      handleDealerTurn();
+    }
+  }
+
+  const canSplitHand = (hand) => {
+    return hand.length === 2 && hand[0].symbol === hand[1].symbol;
+  }
+
+  const handleSplit = () => {
+    let currentHands = [...playerHands];
+    let currentHand = currentHands[activeHandIndex];
+
+    if(canSplitHand(currentHand)) {
+      const firstHand = [currentHand[0]];
+      const secondHand = [currentHand[1]];
+
+      const {newHand : firstHandWithCard, newDeck: updatedDeck1} = drawCard(firstHand, deck);
+      const {newHand: secondHandWithCard, newDeck: updatedDeck2} = drawCard(secondHand, updatedDeck1);
+    
+
+      currentHands.splice(activeHandIndex, 1, firstHandWithCard, secondHandWithCard);
+
+      setPlayerHands(currentHands);
+      setDeck(updatedDeck2);
+    }
+  }
   
   const drawCard = (hand, deck) => {
 
-    let newDeck = deck.slice();
-
-    if(newDeck && newDeck.length > 0) {
+    if(deck && deck.length > 0) {
+      let newDeck = deck.slice();
       const drawnCard = newDeck.shift();
       const newHand = [...hand, drawnCard];
       return {newHand, newDeck};
-    } 
-    
-    return {hand, deck};
+    } else {
+      console.log("deck is empty or not defined");
+      return {hand, deck};
+    }
   }
 
   const handlePlayerDraw = () => {
+    let currentHands = [...playerHands];
+    let currentHand = currentHands[activeHandIndex];
 
-    const {newHand, newDeck} = drawCard(playerHand, deck);
+    const {newHand, newDeck} = drawCard(currentHand, deck);
     const newHandValue = calculateHandValue(newHand);
-    setFirstTurn(false);
-    setPlayerHand(newHand);
+
+    currentHands[activeHandIndex] = newHand;
+    setPlayerHands(currentHands);
     setDeck(newDeck);
 
     if(newHandValue > 21) {
-      setEndRoundPhrase("You busted...")
-      setHasRoundEnded(true);
+      moveToNextHandOrEndRound();
     }
+
   }
 
   const handleDoubleDown = () => {
     setPlayerChips(prevChips => prevChips - bet);
     setBet(prevBet => prevBet * 2);
 
-    // Check if the deck increases here
-    // NOTE: highlight 'newDeck' here
-    const {newHand, newDeck} = drawCard(playerHand, deck);
-    const newHandValue = calculateHandValue(newHand);
-    setPlayerHand(newHand);
+    let currentHands = [...playerHands];
+    let currentHand = currentHands[activeHandIndex];
+
+    const {newHand, newDeck} = drawCard(currentHand, deck);
+
+    currentHands[activeHandIndex] = newHand;
+    setPlayerHands(currentHands);
     setDeck(newDeck);
 
+    const newHandValue = calculateHandValue(newHand);
+
+    // NOTE: Handle the round ending by calling on determineRoundWinner 
+    // to handle the case of busting
     if(newHandValue > 21) {
       setEndRoundPhrase("You busted...")
       setHasRoundEnded(true);
     } else {
-      handleDealerTurn(newHand, newDeck);
+      moveToNextHandOrEndRound();
     }
   }
 
-  const handleDealerTurn = (newHand, updatedDeck) => {
+  const handleDealerTurn = () => {
 
     let newDealerHand = dealerHand.slice();
-    let newDeck = updatedDeck.slice();
+    let newDeck = deck.slice();
     let dealerHandValue = calculateHandValue(newDealerHand);
 
     while(dealerHandValue <= 17 && newDeck.length > 0) {
-      // Switch to drawing the cards similar to the way the player draws cards?
       const drawnCard = newDeck.shift();
       newDealerHand.push(drawnCard);
       dealerHandValue = calculateHandValue(newDealerHand);
@@ -207,7 +252,17 @@ function App() {
 
     setDeck(newDeck);
     setDealerHand(newDealerHand);
-    determineRoundWinner(newHand, newDealerHand);
+
+    let finalRoundResults = playerHands.map((hand, index) => {
+      let result = determineRoundWinner(hand, newDealerHand);
+      return `Hand ${index + 1}: ${result}`;
+    })
+
+    // playerHands.forEach((hand) => {
+    //   determineRoundWinner(hand, newDealerHand);
+    // });
+    
+    setEndRoundPhrase(finalRoundResults.join("\n"));
     setHasRoundEnded(true);
   }
 
@@ -221,23 +276,22 @@ function App() {
     console.log(dealerValue);
     let playerCurrentChips = playerChips;
     let currentBet = bet;
+    let resultMessage = "";
 
     if(playerValue > 21) {
-      setEndRoundPhrase("You lost...")
-    } else if(dealerValue > 21) {
+      resultMessage = "Busted...";
+    } else if(dealerValue > 21 || playerValue > dealerValue) {
       playerCurrentChips += (currentBet * 2);
-      setEndRoundPhrase("You win!")
+      resultMessage = "Win!";
     } else if(playerValue === dealerValue) {
       playerCurrentChips += currentBet;
-      setEndRoundPhrase("Draw");
-    } else if(playerValue > dealerValue) {
-      playerCurrentChips += (currentBet * 2);
-      setEndRoundPhrase("You win!")
+      resultMessage = "Draw";
     } else {
-      setEndRoundPhrase("You lost...")
+      resultMessage = "Lost";
     }
 
     setPlayerChips(playerCurrentChips);
+    return resultMessage;
   }
 
   const startGame = () => {
@@ -258,15 +312,18 @@ function App() {
         <div>
           <h2>Your chips: {playerChips}</h2>
           <h2>Current Bet: {bet}</h2>
-          <h2>Player's Hand</h2>
-          <p>Value: {calculateHandValue(playerHand)}</p>
-          {playerHand.map((card, index) => (
-            <div key={index}>{card.toString()}</div>
+          <h2>Player's Hands</h2>
+          {playerHands.map((hand, index) => (
+            <div key={index}>
+              <p>Hand {index + 1} Value: {calculateHandValue(hand)}</p>
+              <HandDisplay hand={hand} isActive={index === activeHandIndex}></HandDisplay>
+              </div>
           ))}
 
           <button onClick={handlePlayerDraw} disabled={hasRoundEnded}>Hit</button>
-          <button onClick={() => handleDealerTurn(playerHand, deck)} disabled={hasRoundEnded}>Stand</button>
-          <button onClick={handleDoubleDown} disabled={hasRoundEnded || !firstTurn}>Double Down</button>
+          <button onClick={handleStand} disabled={hasRoundEnded}>Stand</button>
+          <button onClick={handleDoubleDown} disabled={hasRoundEnded || playerHands[activeHandIndex].length !== 2}>Double Down</button>
+          <button onClick={handleSplit} disabled={hasRoundEnded || !canSplitHand(playerHands[activeHandIndex])}>Split</button>
 
           <br></br>
 
